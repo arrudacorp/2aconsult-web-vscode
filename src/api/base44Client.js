@@ -1,6 +1,4 @@
 // src/api/base44Client.js
-// Adaptador completo que substitui o Base44 SDK pelo Supabase
-// Com bypass de permissões para garantir funcionamento
 import { supabase } from '@/lib/supabase';
 
 // Mapeamento de entidades para tabelas no Supabase
@@ -15,44 +13,19 @@ const entityToTable = {
   'User': 'app_users',
 };
 
-// Função segura para executar queries - ignora erros de permissão
+// Função segura para executar queries
 const safeQuery = async (queryFn, entityName, defaultValue = []) => {
   try {
     return await queryFn();
   } catch (error) {
-    console.warn(`⚠️ Permissão negada ou erro para ${entityName}:`, error.message);
+    console.warn(`⚠️ Erro para ${entityName}:`, error.message);
     return defaultValue;
   }
 };
 
-// Função segura para inserir em lote
-const safeBatchInsert = async (tableName, items, entityName) => {
-  if (!items.length) return [];
-  
-  try {
-    const { data, error } = await supabase.from(tableName).insert(items).select();
-    if (error) throw error;
-    return data || [];
-  } catch (error) {
-    console.warn(`⚠️ Erro ao inserir em ${entityName}:`, error.message);
-    // Tenta inserir um por um se o batch falhar
-    const results = [];
-    for (const item of items) {
-      try {
-        const { data, error } = await supabase.from(tableName).insert(item).select().single();
-        if (!error && data) results.push(data);
-      } catch (e) {
-        console.warn(`⚠️ Falha ao inserir item em ${entityName}:`, e.message);
-      }
-    }
-    return results;
-  }
-};
-
-// Funções base para cada entidade (com tratamento de erro)
+// Funções base para cada entidade
 const createEntityAPI = (entityName, tableName) => {
   return {
-    // Listar todos os registros
     list: async () => {
       return safeQuery(async () => {
         const { data, error } = await supabase.from(tableName).select('*');
@@ -61,7 +34,6 @@ const createEntityAPI = (entityName, tableName) => {
       }, entityName, []);
     },
     
-    // Buscar um registro por ID
     get: async (id) => {
       return safeQuery(async () => {
         const { data, error } = await supabase.from(tableName).select('*').eq('id', id).single();
@@ -70,7 +42,6 @@ const createEntityAPI = (entityName, tableName) => {
       }, entityName, null);
     },
     
-    // Criar um registro
     create: async (item) => {
       try {
         const { data, error } = await supabase.from(tableName).insert(item).select().single();
@@ -78,11 +49,10 @@ const createEntityAPI = (entityName, tableName) => {
         return data;
       } catch (error) {
         console.warn(`⚠️ Erro ao criar em ${entityName}:`, error.message);
-        return { ...item, id: Date.now() }; // Retorna mock em caso de erro
+        return { ...item, id: Date.now() };
       }
     },
     
-    // Atualizar um registro
     update: async (id, updates) => {
       try {
         const { data, error } = await supabase.from(tableName).update(updates).eq('id', id).select().single();
@@ -94,7 +64,6 @@ const createEntityAPI = (entityName, tableName) => {
       }
     },
     
-    // Deletar um registro
     delete: async (id) => {
       try {
         const { error } = await supabase.from(tableName).delete().eq('id', id);
@@ -106,34 +75,16 @@ const createEntityAPI = (entityName, tableName) => {
       }
     },
     
-    // Deletar todos os registros
     deleteMany: async (filter = {}) => {
       try {
-        // Primeiro busca todos os IDs
-        const { data: records, error: selectError } = await supabase
-          .from(tableName)
-          .select('id');
-        
+        const { data: records, error: selectError } = await supabase.from(tableName).select('id');
         if (selectError) throw selectError;
         
-        if (!records || records.length === 0) {
-          console.log(`📭 Nenhum registro para deletar em ${tableName}`);
-          return true;
-        }
+        if (!records || records.length === 0) return true;
         
-        // Deleta um por um
         for (const record of records) {
-          const { error: deleteError } = await supabase
-            .from(tableName)
-            .delete()
-            .eq('id', record.id);
-          
-          if (deleteError) {
-            console.warn(`⚠️ Erro ao deletar registro ${record.id}:`, deleteError.message);
-          }
+          await supabase.from(tableName).delete().eq('id', record.id);
         }
-        
-        console.log(`✅ Todos os registros de ${tableName} foram removidos`);
         return true;
       } catch (error) {
         console.warn(`⚠️ Erro ao deletar todos de ${entityName}:`, error.message);
@@ -141,9 +92,16 @@ const createEntityAPI = (entityName, tableName) => {
       }
     },
     
-    // Criar múltiplos registros em lote
     bulkCreate: async (items) => {
-      return safeBatchInsert(tableName, items, entityName);
+      if (!items.length) return [];
+      try {
+        const { data, error } = await supabase.from(tableName).insert(items).select();
+        if (error) throw error;
+        return data || [];
+      } catch (error) {
+        console.warn(`⚠️ Erro ao inserir em ${entityName}:`, error.message);
+        return items;
+      }
     },
   };
 };
@@ -154,16 +112,16 @@ for (const [entityName, tableName] of Object.entries(entityToTable)) {
   entities[entityName] = createEntityAPI(entityName, tableName);
 }
 
-// API Proxy - substitui base44.functions.invoke
+// API Proxy
 const functions = {
   invoke: async (name, params) => {
     if (name === 'apiProxy') {
       const { action, entity, id, data } = params;
       
       try {
-        // Busca dados da API externa (via apiClient)
+        const { default: apiClient } = await import('@/lib/apiClient');
+        
         if (action === 'list') {
-          const { default: apiClient } = await import('@/lib/apiClient');
           let result;
           switch (entity) {
             case 'users': result = await apiClient.getUsers(); break;
@@ -176,9 +134,7 @@ const functions = {
           return { data: result || [] };
         }
         
-        // Create
         if (action === 'create') {
-          const { default: apiClient } = await import('@/lib/apiClient');
           let result;
           switch (entity) {
             case 'users': result = await apiClient.createUser(data); break;
@@ -190,9 +146,7 @@ const functions = {
           return { data: result || {} };
         }
         
-        // Update
         if (action === 'update') {
-          const { default: apiClient } = await import('@/lib/apiClient');
           let result;
           switch (entity) {
             case 'users': result = await apiClient.updateUser(id, data); break;
@@ -204,9 +158,7 @@ const functions = {
           return { data: result || {} };
         }
         
-        // Delete
         if (action === 'delete') {
-          const { default: apiClient } = await import('@/lib/apiClient');
           switch (entity) {
             case 'users': await apiClient.deleteUser(id); break;
             case 'unidades': await apiClient.deleteUnidade(id); break;
@@ -217,15 +169,13 @@ const functions = {
           return { data: { success: true } };
         }
         
-        // Reset Senha
         if (action === 'resetSenha') {
-          const { default: apiClient } = await import('@/lib/apiClient');
           await apiClient.resetUserPassword(id, data);
           return { data: { success: true } };
         }
         
       } catch (error) {
-        console.warn(`⚠️ Erro no apiProxy para ${entity}/${action}:`, error.message);
+        console.warn(`⚠️ Erro no apiProxy:`, error.message);
         return { data: [] };
       }
       
@@ -235,12 +185,15 @@ const functions = {
   }
 };
 
-// Autenticação (para compatibilidade)
+// Autenticação
 const auth = {
   me: async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      return user;
+      const storedUser = localStorage.getItem('system_user');
+      if (storedUser) {
+        return JSON.parse(storedUser);
+      }
+      return null;
     } catch (error) {
       console.warn('⚠️ Erro ao buscar usuário:', error.message);
       return null;
@@ -252,7 +205,7 @@ const auth = {
   }
 };
 
-// Usuários do sistema local
+// Usuários
 const users = {
   list: async () => {
     try {
@@ -279,7 +232,7 @@ const users = {
         .single();
       
       if (error) throw error;
-      console.log(`Usuário criado: ${email}, Senha: ${tempPassword}`);
+      console.log(`Usuário criado: ${email}`);
       return { success: true, tempPassword };
     } catch (error) {
       console.warn('⚠️ Erro ao criar usuário:', error.message);
@@ -288,7 +241,6 @@ const users = {
   }
 };
 
-// Cliente base44 completo
 export const base44 = {
   entities,
   functions,

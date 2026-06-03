@@ -16,24 +16,25 @@ async function getApiBaseUrl() {
     
     if (error) {
       console.warn('Erro ao buscar parâmetros:', error);
-      return '/api-proxy-producao';
+      return 'http://179.0.177.138:8091';
     }
     
-    let proxyPath;
+    // Escolhe a URL baseada no modo
+    let url;
     if (data.modo === 'teste') {
-      proxyPath = '/api-proxy-teste';
+      url = data.url_teste;
       console.log('🔧 Modo TESTE ativado');
     } else {
-      proxyPath = '/api-proxy-producao';
+      url = data.url_producao;
       console.log('🔧 Modo PRODUÇÃO ativado');
     }
     
-    cachedApiBaseUrl = proxyPath;
-    console.log(`🔧 API Client usando proxy: ${cachedApiBaseUrl}`);
+    cachedApiBaseUrl = url || 'http://179.0.177.138:8091';
+    console.log(`🔧 API Client usando URL: ${cachedApiBaseUrl}`);
     return cachedApiBaseUrl;
   } catch (err) {
-    console.warn('Erro ao buscar parâmetros:', err);
-    return '/api-proxy-producao';
+    console.warn('Erro ao buscar parâmetros, usando URL padrão:', err);
+    return 'http://179.0.177.138:8091';
   }
 }
 
@@ -54,24 +55,18 @@ async function fetchFromApi(endpoint, options = {}) {
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}`);
     }
     
-    // Verifica se a resposta tem conteúdo antes de tentar parsear JSON
+    // Verifica se a resposta tem conteúdo
     const text = await response.text();
-    
-    // Se a resposta estiver vazia, retorna um objeto vazio ou null
     if (!text || text.trim() === '') {
-      console.log('⚠️ Resposta vazia da API');
       return { success: true };
     }
     
-    // Tenta parsear o JSON
     try {
-      const data = JSON.parse(text);
-      return data;
-    } catch (parseError) {
-      console.warn('⚠️ Resposta não é JSON válido:', text.substring(0, 100));
+      return JSON.parse(text);
+    } catch {
       return { raw: text, success: true };
     }
   } catch (error) {
@@ -86,8 +81,7 @@ export function clearApiUrlCache() {
   console.log('🗑️ Cache da URL da API limpo');
 }
 
-// Cria o objeto apiClient
-const apiClient = {
+export const apiClient = {
   // Instituições
   async getInstituicoes() {
     return fetchFromApi('/instituicoes');
@@ -195,7 +189,7 @@ const apiClient = {
     });
   },
 
-  // Questionários
+  // Questionários - Retorna dados BRUTOS da API
   async getQuestionarios() {
     const data = await fetchFromApi('/questionarios');
     console.log(`📊 API retornou ${Array.isArray(data) ? data.length : '?'} questionários`);
@@ -231,6 +225,4 @@ const apiClient = {
   }
 };
 
-// Exporta como default e como named export
 export default apiClient;
-export { apiClient };
