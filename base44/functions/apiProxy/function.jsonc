@@ -1,0 +1,4 @@
+{
+  "name": "apiProxy",
+  "entry": "entry.ts"
+}

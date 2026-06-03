@@ -1,0 +1,115 @@
+{
+  "name": "Questionario",
+  "type": "object",
+  "properties": {
+    "questionario_id": {
+      "type": "number",
+      "description": "ID do question\u00e1rio"
+    },
+    "id_user": {
+      "type": "number",
+      "description": "userId da API (FK para AppUser.user_app_id)"
+    },
+    "id_user_app": {
+      "type": "string",
+      "description": "Prontu\u00e1rio (ex: 91-001)"
+    },
+    "responsavel": {
+      "type": "string",
+      "description": "Respons\u00e1vel"
+    },
+    "endereco": {
+      "type": "string",
+      "description": "Endere\u00e7o"
+    },
+    "data": {
+      "type": "string",
+      "description": "Data"
+    },
+    "risco": {
+      "type": "string",
+      "description": "Pontua\u00e7\u00e3o de risco"
+    },
+    "acamado": {
+      "type": "number",
+      "description": "Acamado (qtde)"
+    },
+    "def_fisico": {
+      "type": "number",
+      "description": "Deficiente f\u00edsico (qtde)"
+    },
+    "def_mental": {
+      "type": "number",
+      "description": "Deficiente mental (qtde)"
+    },
+    "saneamento": {
+      "type": "number",
+      "description": "Saneamento (qtde)"
+    },
+    "desnutricao": {
+      "type": "number",
+      "description": "Desnutri\u00e7\u00e3o (qtde)"
+    },
+    "drogadicao": {
+      "type": "number",
+      "description": "Drogadi\u00e7\u00e3o (qtde)"
+    },
+    "desemprego": {
+      "type": "number",
+      "description": "Desemprego (qtde)"
+    },
+    "analfabetismo": {
+      "type": "number",
+      "description": "Analfabetismo (qtde)"
+    },
+    "menor6meses": {
+      "type": "number",
+      "description": "Menor de 6 meses (qtde)"
+    },
+    "maior70": {
+      "type": "number",
+      "description": "Maior de 70 anos (qtde)"
+    },
+    "hipertensao": {
+      "type": "number",
+      "description": "Hipertens\u00e3o (qtde)"
+    },
+    "diabetes": {
+      "type": "number",
+      "description": "Diabetes (qtde)"
+    },
+    "comodo_maior1": {
+      "type": "number",
+      "description": "C\u00f4modo maior que 1 (qtde)"
+    },
+    "comodo_igual1": {
+      "type": "number",
+      "description": "C\u00f4modo igual a 1 (qtde)"
+    },
+    "comodo_menor1": {
+      "type": "number",
+      "description": "C\u00f4modo menor que 1 (qtde)"
+    }
+  },
+  "required": [
+    "questionario_id"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {},
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "Link",
+  "type": "object",
+  "properties": {
+    "links_id": {
+      "type": "number",
+      "description": "ID do link"
+    },
+    "desc_link": {
+      "type": "string",
+      "description": "Descri\u00e7\u00e3o do link"
+    },
+    "link": {
+      "type": "string",
+      "description": "URL do link"
+    }
+  },
+  "required": [
+    "desc_link",
+    "link"
+  ]
+}

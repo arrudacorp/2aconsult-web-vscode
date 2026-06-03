@@ -1,0 +1,30 @@
+{
+  "name": "Unidade",
+  "type": "object",
+  "properties": {
+    "unidade_id": {
+      "type": "number",
+      "description": "ID da unidade"
+    },
+    "id_instituicao": {
+      "type": "number",
+      "description": "ID da institui\u00e7\u00e3o"
+    },
+    "cnes": {
+      "type": "string",
+      "description": "CNES"
+    },
+    "nome_unidade": {
+      "type": "string",
+      "description": "Nome da unidade"
+    },
+    "id_unidade_api": {
+      "type": "number",
+      "description": "ID da unidade na API"
+    }
+  },
+  "required": [
+    "unidade_id",
+    "nome_unidade"
+  ]
+}

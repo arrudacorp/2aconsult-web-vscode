@@ -1,0 +1,26 @@
+{
+  "name": "Parametros",
+  "type": "object",
+  "properties": {
+    "modo": {
+      "type": "string",
+      "enum": [
+        "producao",
+        "teste"
+      ],
+      "default": "producao",
+      "description": "Modo de opera\u00e7\u00e3o"
+    },
+    "url_producao": {
+      "type": "string",
+      "description": "URL da API de produ\u00e7\u00e3o"
+    },
+    "url_teste": {
+      "type": "string",
+      "description": "URL da API de teste"
+    }
+  },
+  "required": [
+    "modo"
+  ]
+}

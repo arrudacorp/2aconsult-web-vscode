@@ -1,0 +1,42 @@
+{
+  "name": "AppUser",
+  "type": "object",
+  "properties": {
+    "user_app_id": {
+      "type": "number",
+      "description": "ID do usu\u00e1rio no app"
+    },
+    "home_user": {
+      "type": "string",
+      "description": "Nome do usu\u00e1rio"
+    },
+    "ativo": {
+      "type": "boolean",
+      "description": "Se o usu\u00e1rio est\u00e1 ativo"
+    },
+    "senha": {
+      "type": "string",
+      "description": "Senha do usu\u00e1rio"
+    },
+    "id_user_api": {
+      "type": "number",
+      "description": "ID do usu\u00e1rio na API"
+    },
+    "ine": {
+      "type": "string",
+      "description": "INE"
+    },
+    "cpf": {
+      "type": "string",
+      "description": "CPF"
+    },
+    "teste": {
+      "type": "boolean",
+      "description": "Flag de teste"
+    }
+  },
+  "required": [
+    "user_app_id",
+    "home_user"
+  ]
+}
