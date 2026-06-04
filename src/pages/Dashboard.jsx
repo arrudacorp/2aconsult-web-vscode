@@ -99,6 +99,7 @@ const mapEntityData = (apiEntity, items) => {
 const dashSyncLocks = {};
 
 // Função de sincronização para uma entidade
+// Função de sincronização para uma entidade
 async function syncEntity({ apiEntity, localEntity, tableName, idField }) {
   if (dashSyncLocks[localEntity]) {
     throw new Error("Sync já em andamento para " + localEntity);
@@ -113,22 +114,7 @@ async function syncEntity({ apiEntity, localEntity, tableName, idField }) {
     const apiData = await getApiData(apiEntity);
     const apiItems = Array.isArray(apiData) ? apiData : (apiData.data || apiData.items || []);
     
-    if (apiItems.length === 0) {
-      console.log(`⚠️ Nenhum dado encontrado na API para ${localEntity}`);
-      return 0;
-    }
-    
-    console.log(`📦 API retornou ${apiItems.length} registros para ${localEntity}`);
-    
-    // 2. Mapeia os dados usando mapApiFields
-    const mappedItems = mapEntityData(apiEntity, apiItems);
-    
-    if (mappedItems.length === 0) {
-      console.warn(`⚠️ Nenhum item mapeado para ${localEntity}`);
-      return 0;
-    }
-    
-    // 3. Remove todos os dados locais do Supabase
+    // 2. Primeiro, APAGA todos os dados locais (sempre)
     const { error: deleteError } = await supabase
       .from(tableName)
       .delete()
@@ -139,7 +125,25 @@ async function syncEntity({ apiEntity, localEntity, tableName, idField }) {
       throw deleteError;
     }
     
-    // 4. Insere os novos dados em lotes de 50
+    console.log(`🗑️ Dados antigos de ${localEntity} removidos`);
+    
+    // 3. Se não há dados na API, retorna 0 (já limpou a tabela)
+    if (apiItems.length === 0) {
+      console.log(`⚠️ Nenhum dado encontrado na API para ${localEntity}, tabela limpa`);
+      return 0;
+    }
+    
+    console.log(`📦 API retornou ${apiItems.length} registros para ${localEntity}`);
+    
+    // 4. Mapeia os dados
+    const mappedItems = mapEntityData(apiEntity, apiItems);
+    
+    if (mappedItems.length === 0) {
+      console.warn(`⚠️ Nenhum item mapeado para ${localEntity}`);
+      return 0;
+    }
+    
+    // 5. Insere os novos dados em lotes de 50
     const BATCH = 50;
     let insertedCount = 0;
     

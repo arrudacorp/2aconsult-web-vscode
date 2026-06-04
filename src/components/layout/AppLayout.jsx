@@ -11,7 +11,13 @@ export default function AppLayout({ children }) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader onToggleSidebar={toggleSidebar} />
+      {/* Header fixo no topo */}
+      <div className="fixed top-0 left-0 right-0 z-50">
+        <AppHeader onToggleSidebar={toggleSidebar} />
+      </div>
+      
+      {/* Espaçador para compensar o header fixo */}
+      <div className="h-16" />
       
       <div className="flex relative">
         <AppSidebar open={sidebarOpen} onClose={closeSidebar} />
