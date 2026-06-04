@@ -30,7 +30,7 @@ export default function AppHeader({ onToggleSidebar }) {
             className="w-9 h-9 object-contain rounded"
           />
           <h1 className="text-white font-semibold text-lg tracking-tight hidden sm:block">
-            2A Consultoria
+            Risco Familiar Web
           </h1>
         </Link>
       </div>
