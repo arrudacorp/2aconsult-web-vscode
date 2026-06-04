@@ -5,18 +5,6 @@ let cachedApiBaseUrl = null;
 
 // Busca a URL da API dos parâmetros no Supabase
 async function getApiBaseUrl() {
-  // Em produção (Vercel), usa o proxy serverless
-  if (import.meta.env.PROD) {
-    console.log('🔧 Produção: usando proxy serverless');
-    return '/api/proxy';
-  }
-  
-  // Em desenvolvimento, usa o proxy do Vite
-  if (import.meta.env.DEV && cachedApiBaseUrl === null) {
-    console.log('🔧 Desenvolvimento: usando proxy local');
-    return '/api-proxy';
-  }
-  
   if (cachedApiBaseUrl) return cachedApiBaseUrl;
   
   try {
@@ -26,41 +14,40 @@ async function getApiBaseUrl() {
       .limit(1)
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.warn('Erro ao buscar parâmetros:', error);
+      return 'https://api-teste.2aconsult.com.br';
+    }
     
-    const url = data.modo === 'teste' ? data.url_teste : data.url_producao;
-    cachedApiBaseUrl = url || 'http://179.0.177.138:8091';
+    // Escolhe a URL baseada no modo
+    let url;
+    if (data.modo === 'teste') {
+      url = data.url_teste;
+      console.log('🔧 Modo TESTE ativado');
+    } else {
+      url = data.url_producao;
+      console.log('🔧 Modo PRODUÇÃO ativado');
+    }
     
-    console.log(`🔧 API Client usando URL: ${cachedApiBaseUrl} (modo: ${data.modo})`);
+    cachedApiBaseUrl = url || 'https://api-teste.2aconsult.com.br';
+    console.log(`🔧 API Client usando URL: ${cachedApiBaseUrl}`);
     return cachedApiBaseUrl;
   } catch (err) {
     console.warn('Erro ao buscar parâmetros, usando URL padrão:', err);
-    return import.meta.env.DEV ? '/api-proxy' : '/api/proxy';
+    return 'https://api-teste.2aconsult.com.br';
   }
 }
 
-// Função para fazer requisições com a URL correta
+// Função para fazer requisições diretamente (sem proxy)
 async function fetchFromApi(endpoint, options = {}) {
   const baseUrl = await getApiBaseUrl();
-  
-  let url;
-  let fetchOptions = { ...options };
-  
-  // Se estiver usando o proxy (em produção ou dev)
-  if (baseUrl.includes('/api/proxy') || baseUrl.includes('/api-proxy')) {
-    // Remove a barra inicial do endpoint
-    const cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
-    url = `${baseUrl}?path=${cleanEndpoint}`;
-  } else {
-    // URL direta
-    url = `${baseUrl}${endpoint}`;
-  }
+  const url = `${baseUrl}${endpoint}`;
   
   console.log(`📡 Fetch: ${options.method || 'GET'} ${url}`);
   
   try {
     const response = await fetch(url, {
-      ...fetchOptions,
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
@@ -71,8 +58,17 @@ async function fetchFromApi(endpoint, options = {}) {
       throw new Error(`HTTP ${response.status}`);
     }
     
-    const data = await response.json();
-    return data;
+    // Verifica se a resposta tem conteúdo
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      return { success: true };
+    }
+    
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { raw: text, success: true };
+    }
   } catch (error) {
     console.error(`❌ Erro na requisição para ${url}:`, error);
     throw error;
@@ -85,7 +81,6 @@ export function clearApiUrlCache() {
   console.log('🗑️ Cache da URL da API limpo');
 }
 
-// Resto do apiClient continua igual...
 export const apiClient = {
   async getInstituicoes() {
     return fetchFromApi('/instituicoes');
@@ -142,12 +137,6 @@ export const apiClient = {
   },
   async resetUserPassword(id, senha) {
     return fetchFromApi(`/users/${id}/senha`, { method: 'PUT', body: JSON.stringify({ senha }) });
-  },
-  async getQuestionariosByUser(userId) {
-    return fetchFromApi(`/users/${userId}/questionarios?limit=200`);
-  },
-  async getQuestionariosByDate(date) {
-    return fetchFromApi(`/questionarios/data/${date}`);
   },
 };
 
