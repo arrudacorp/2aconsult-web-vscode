@@ -38,7 +38,7 @@ async function getApiBaseUrl() {
   }
 }
 
-// Função para fazer requisições diretamente (sem proxy)
+// Função para fazer requisições com a URL correta
 async function fetchFromApi(endpoint, options = {}) {
   const baseUrl = await getApiBaseUrl();
   const url = `${baseUrl}${endpoint}`;
@@ -75,69 +75,154 @@ async function fetchFromApi(endpoint, options = {}) {
   }
 }
 
-// Limpa o cache da URL
+// Limpa o cache da URL (usado quando os parâmetros são salvos)
 export function clearApiUrlCache() {
   cachedApiBaseUrl = null;
   console.log('🗑️ Cache da URL da API limpo');
 }
 
 export const apiClient = {
+  // Instituições
   async getInstituicoes() {
     return fetchFromApi('/instituicoes');
   },
+  
+  async createInstituicao(data) {
+    return fetchFromApi('/instituicao', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async updateInstituicao(id, data) {
+    return fetchFromApi(`/instituicao/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async deleteInstituicao(id) {
+    return fetchFromApi(`/instituicao/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Unidades
   async getUnidades() {
     return fetchFromApi('/unidades');
   },
+  
+  async createUnidade(data) {
+    return fetchFromApi('/unidade', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async updateUnidade(id, data) {
+    return fetchFromApi(`/unidade/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async deleteUnidade(id) {
+    return fetchFromApi(`/unidade/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Equipes
   async getEquipes() {
     return fetchFromApi('/equipes');
   },
+  
+  async createEquipe(data) {
+    return fetchFromApi('/equipe', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async updateEquipe(id, data) {
+    return fetchFromApi(`/equipe/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async deleteEquipe(id) {
+    return fetchFromApi(`/equipe/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // Usuários
   async getUsers() {
     return fetchFromApi('/users');
   },
+  
+  async createUser(data) {
+    return fetchFromApi('/users', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async updateUser(id, data) {
+    return fetchFromApi(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+  
+  async deleteUser(id) {
+    return fetchFromApi(`/users/${id}`, {
+      method: 'DELETE'
+    });
+  },
+  
+  async resetUserPassword(id, senha) {
+    return fetchFromApi(`/users/${id}/senha`, {
+      method: 'PUT',
+      body: JSON.stringify({ senha })
+    });
+  },
+
+  // Questionários - Retorna dados BRUTOS da API
   async getQuestionarios() {
     const data = await fetchFromApi('/questionarios');
-    console.log(`📊 API retornou ${Array.isArray(data) ? data.length : '?'} questionários`);
+    console.log(`📊 API retornou ${Array.isArray(data) ? data.length : '?'} questionários (dados brutos)`);
     return data;
   },
-  async createInstituicao(data) {
-    return fetchFromApi('/instituicao', { method: 'POST', body: JSON.stringify(data) });
+  
+  async getQuestionariosByUser(userId) {
+    return fetchFromApi(`/users/${userId}/questionarios?limit=200`);
   },
-  async updateInstituicao(id, data) {
-    return fetchFromApi(`/instituicao/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  
+  async getQuestionariosByDate(date) {
+    return fetchFromApi(`/questionarios/data/${date}`);
   },
-  async deleteInstituicao(id) {
-    return fetchFromApi(`/instituicao/${id}`, { method: 'DELETE' });
+  
+  async createQuestionario(data) {
+    return fetchFromApi('/questionarios', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
   },
-  async createUnidade(data) {
-    return fetchFromApi('/unidade', { method: 'POST', body: JSON.stringify(data) });
+  
+  async updateQuestionario(id, data) {
+    return fetchFromApi(`/questionarios/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   },
-  async updateUnidade(id, data) {
-    return fetchFromApi(`/unidade/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-  },
-  async deleteUnidade(id) {
-    return fetchFromApi(`/unidade/${id}`, { method: 'DELETE' });
-  },
-  async createEquipe(data) {
-    return fetchFromApi('/equipe', { method: 'POST', body: JSON.stringify(data) });
-  },
-  async updateEquipe(id, data) {
-    return fetchFromApi(`/equipe/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-  },
-  async deleteEquipe(id) {
-    return fetchFromApi(`/equipe/${id}`, { method: 'DELETE' });
-  },
-  async createUser(data) {
-    return fetchFromApi('/users', { method: 'POST', body: JSON.stringify(data) });
-  },
-  async updateUser(id, data) {
-    return fetchFromApi(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-  },
-  async deleteUser(id) {
-    return fetchFromApi(`/users/${id}`, { method: 'DELETE' });
-  },
-  async resetUserPassword(id, senha) {
-    return fetchFromApi(`/users/${id}/senha`, { method: 'PUT', body: JSON.stringify({ senha }) });
-  },
+  
+  async deleteQuestionario(id) {
+    return fetchFromApi(`/questionarios/${id}`, {
+      method: 'DELETE'
+    });
+  }
 };
 
 export default apiClient;
