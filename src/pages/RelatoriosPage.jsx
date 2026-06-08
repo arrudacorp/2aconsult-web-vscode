@@ -2,8 +2,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,42 +10,7 @@ import RelatorioAnalitico from "@/components/relatorios/RelatorioAnalitico";
 import RelatorioAgente from "@/components/relatorios/RelatorioAgente";
 import FiltrosHierarquicos from "@/components/relatorios/FiltrosHierarquicos";
 import { criarDocPDF, drawTable } from "@/lib/pdfUtils";
-
-const MESES = [
-  { value: "1", label: "Janeiro" },
-  { value: "2", label: "Fevereiro" },
-  { value: "3", label: "Março" },
-  { value: "4", label: "Abril" },
-  { value: "5", label: "Maio" },
-  { value: "6", label: "Junho" },
-  { value: "7", label: "Julho" },
-  { value: "8", label: "Agosto" },
-  { value: "9", label: "Setembro" },
-  { value: "10", label: "Outubro" },
-  { value: "11", label: "Novembro" },
-  { value: "12", label: "Dezembro" },
-];
-
-function getAnos() {
-  const atual = new Date().getFullYear();
-  return Array.from({ length: 5 }, (_, i) => String(atual - i));
-}
-
-function getProntuarioBase(prontuario) {
-  if (!prontuario) return String(prontuario || "");
-  const str = String(prontuario);
-  const idx = str.indexOf("/");
-  return idx === -1 ? str.trim() : str.substring(0, idx).trim();
-}
-
-function getProntuarioVersion(prontuario) {
-  if (!prontuario) return 0;
-  const str = String(prontuario);
-  const idx = str.indexOf("/");
-  if (idx === -1) return 0;
-  const num = parseInt(str.substring(idx + 1).trim(), 10);
-  return isNaN(num) ? 0 : num;
-}
+import { deduplicarQuestionarios } from "@/lib/prontuarioUtils";
 
 export function getRiscoLabel(risco) {
   const val = parseInt(risco, 10);
@@ -65,54 +28,7 @@ export function getRiscoClassName(risco) {
   return "bg-red-100 text-red-800 border-red-200";
 }
 
-// Filtra APENAS pela hierarquia (SEM período)
-function filtrarPorHierarquia(questionarios, filtroEquipe, filtroAgente, idsAgentesDaEquipe) {
-  if (!filtroEquipe) return questionarios;
-
-  return questionarios.filter((q) => {
-    if (!idsAgentesDaEquipe || !idsAgentesDaEquipe.has(q.id_user)) return false;
-    if (filtroAgente && q.id_user !== filtroAgente.id_user_api) return false;
-    return true;
-  });
-}
-
-// Filtra por período e deduplica para os relatórios
-function filtrarPorPeriodoEDeduplicar(questionarios, mes, ano) {
-  const filtered = questionarios.filter((q) => {
-    if (!q.data) return false;
-    const d = new Date(q.data);
-    return d.getMonth() + 1 === Number(mes) && d.getFullYear() === Number(ano);
-  });
-
-  const mapaRecentes = {};
-  for (const q of filtered) {
-    const base = getProntuarioBase(q.id_user_app);
-    const versao = getProntuarioVersion(q.id_user_app);
-    if (!mapaRecentes[base] || versao > mapaRecentes[base].versao) {
-      mapaRecentes[base] = { ...q, versao };
-    }
-  }
-
-  return Object.values(mapaRecentes);
-}
-
-// Para exportar, usa os dados filtrados por hierarquia (SEM período)
-function deduplicarParaExportacao(questionarios) {
-  const mapaRecentes = {};
-  for (const q of questionarios) {
-    const base = getProntuarioBase(q.id_user_app);
-    const versao = getProntuarioVersion(q.id_user_app);
-    if (!mapaRecentes[base] || versao > mapaRecentes[base].versao) {
-      mapaRecentes[base] = { ...q, versao };
-    }
-  }
-  return Object.values(mapaRecentes);
-}
-
 export default function RelatoriosPage() {
-  const hoje = new Date();
-  const [mes, setMes] = useState(String(hoje.getMonth() + 1));
-  const [ano, setAno] = useState(String(hoje.getFullYear()));
   const [questionarios, setQuestionarios] = useState([]);
   const [users, setUsers] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -156,23 +72,27 @@ export default function RelatoriosPage() {
     return new Set(agentesVinculados.map((u) => u.id_user_api));
   }, [filtroEquipe, users]);
 
-  // Dados filtrados APENAS por hierarquia (para o botão de exportar)
-  const dadosHierarquia = useMemo(() => {
-    const filtrados = filtrarPorHierarquia(questionarios, filtroEquipe, filtroAgente, idsAgentesDaEquipe);
-    return deduplicarParaExportacao(filtrados);
+  // Dados filtrados pela hierarquia e deduplicados
+  const dadosFiltrados = useMemo(() => {
+    let resultado = questionarios;
+    
+    // Aplica filtro hierárquico
+    if (filtroEquipe) {
+      resultado = resultado.filter((q) => {
+        if (!idsAgentesDaEquipe || !idsAgentesDaEquipe.has(q.id_user)) return false;
+        if (filtroAgente && q.id_user !== filtroAgente.id_user_api) return false;
+        return true;
+      });
+    }
+    
+    // Deduplica por prontuário (mantém apenas o mais recente)
+    return deduplicarQuestionarios(resultado);
   }, [questionarios, filtroEquipe, filtroAgente, idsAgentesDaEquipe]);
 
-  // Dados filtrados por hierarquia + período (para os relatórios das abas)
-  const dadosRelatorios = useMemo(() => {
-    const filtrados = filtrarPorHierarquia(questionarios, filtroEquipe, filtroAgente, idsAgentesDaEquipe);
-    return filtrarPorPeriodoEDeduplicar(filtrados, mes, ano);
-  }, [questionarios, filtroEquipe, filtroAgente, idsAgentesDaEquipe, mes, ano]);
-
-  const mesLabel = MESES.find((m) => m.value === mes)?.label || "";
   const [exporting, setExporting] = useState(false);
 
   const exportarProntuariosPDF = async () => {
-    if (!dadosHierarquia.length) return;
+    if (!dadosFiltrados.length) return;
     setExporting(true);
     try {
       const { doc, contentStartY, usableW, marginLeft, pageH, addFooters } = await criarDocPDF({
@@ -199,7 +119,7 @@ export default function RelatoriosPage() {
       drawTable(doc, {
         startY: y,
         headers: ["Prontuário", "Agente", "Responsável", "Endereço", "Risco", "Classificação", "Data"],
-        rows: dadosHierarquia.map((q) => [
+        rows: dadosFiltrados.map((q) => [
           q.id_user_app || "—",
           userMap[q.id_user] || (q.id_user ? `ID: ${q.id_user}` : "—"),
           q.responsavel || "—",
@@ -224,7 +144,7 @@ export default function RelatoriosPage() {
       addFooters();
       const slug = (filtroAgente?.home_user || filtroEquipe?.descricao || filtroUnidade?.nome_unidade || "todos")
         .replace(/\s+/g, "_").toLowerCase();
-      doc.save(`prontuarios_${slug}_todos_periodos.pdf`);
+      doc.save(`prontuarios_${slug}.pdf`);
     } finally {
       setExporting(false);
     }
@@ -236,8 +156,8 @@ export default function RelatoriosPage() {
     unidade: unidadePdf,
     instituicao,
     userName: currentUser?.full_name || currentUser?.email || "—",
-    mesLabel,
-    ano,
+    mesLabel: "Todos",
+    ano: "Todos",
   };
 
   return (
@@ -247,7 +167,7 @@ export default function RelatoriosPage() {
       <Card className="mb-4 shadow-sm">
         <CardContent className="pt-5 space-y-4">
           
-          {/* ÁREA DO FILTRO HIERÁRQUICO (INDEPENDENTE) */}
+          {/* ÁREA DO FILTRO HIERÁRQUICO */}
           <div className="space-y-3">
             <FiltrosHierarquicos
               unidades={unidades}
@@ -261,8 +181,8 @@ export default function RelatoriosPage() {
               onAgenteChange={setFiltroAgente}
             />
             
-            {/* Botão Exportar Prontuários - USA dados HIERARQUIA (SEM período) */}
-            {(filtroEquipe || filtroAgente) && dadosHierarquia.length > 0 && (
+            {/* Botão Exportar Prontuários */}
+            {(filtroEquipe || filtroAgente) && dadosFiltrados.length > 0 && (
               <div className="flex justify-end">
                 <Button
                   onClick={exportarProntuariosPDF}
@@ -271,40 +191,10 @@ export default function RelatoriosPage() {
                   disabled={exporting}
                 >
                   {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
-                  Exportar Prontuários ({dadosHierarquia.length})
+                  Exportar Prontuários ({dadosFiltrados.length})
                 </Button>
               </div>
             )}
-          </div>
-
-          {/* FILTRO DE PERÍODO (apenas para as abas) */}
-          <div className="flex flex-wrap gap-4 items-end pt-2 border-t">
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Mês</Label>
-              <Select value={mes} onValueChange={setMes}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MESES.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-sm font-medium">Ano</Label>
-              <Select value={ano} onValueChange={setAno}>
-                <SelectTrigger className="w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAnos().map((a) => (
-                    <SelectItem key={a} value={a}>{a}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
         </CardContent>
@@ -323,15 +213,15 @@ export default function RelatoriosPage() {
           </TabsList>
 
           <TabsContent value="sintetico">
-            <RelatorioSintetico dados={dadosRelatorios} userMap={userMap} {...pdfProps} />
+            <RelatorioSintetico dados={dadosFiltrados} userMap={userMap} {...pdfProps} />
           </TabsContent>
 
           <TabsContent value="analitico">
-            <RelatorioAnalitico dados={dadosRelatorios} userMap={userMap} {...pdfProps} />
+            <RelatorioAnalitico dados={dadosFiltrados} userMap={userMap} {...pdfProps} />
           </TabsContent>
 
           <TabsContent value="agente">
-            <RelatorioAgente dados={dadosRelatorios} userMap={userMap} {...pdfProps} />
+            <RelatorioAgente dados={dadosFiltrados} userMap={userMap} {...pdfProps} />
           </TabsContent>
         </Tabs>
       )}

@@ -1,5 +1,5 @@
 // src/pages/Dashboard.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, MapPin, UsersRound, FileText, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
@@ -9,24 +9,7 @@ import { mapApiFields } from "@/lib/mapApiFields";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import QuestionarioChart from "@/components/dashboard/QuestionarioChart";
-
-
-// Helpers de deduplicação por prontuário
-function getProntuarioBase(prontuario) {
-  if (!prontuario) return "";
-  const str = String(prontuario);
-  const idx = str.indexOf("/");
-  return idx === -1 ? str.trim() : str.substring(0, idx).trim();
-}
-
-function getProntuarioVersion(prontuario) {
-  if (!prontuario) return 0;
-  const str = String(prontuario);
-  const idx = str.indexOf("/");
-  if (idx === -1) return 0;
-  const num = parseInt(str.substring(idx + 1).trim(), 10);
-  return isNaN(num) ? 0 : num;
-}
+import { countProntuariosUnicos } from "@/lib/prontuarioUtils";
 
 const statCards = [
   { label: "Usuários (API)", icon: Users, entity: "AppUser", color: "bg-primary" },
@@ -65,6 +48,18 @@ const getApiData = async (apiEntity) => {
   }
 };
 
+// Função para converter valor para número de forma segura
+const safeNumber = (value) => {
+  const num = Number(value);
+  return isNaN(num) ? 0 : num;
+};
+
+// Função para converter valor para string de forma segura
+const safeString = (value, defaultValue = '') => {
+  if (value === null || value === undefined) return defaultValue;
+  return String(value);
+};
+
 // Mapeamento usando o mapApiFields existente
 const mapEntityData = (apiEntity, items) => {
   if (!Array.isArray(items)) {
@@ -99,7 +94,6 @@ const mapEntityData = (apiEntity, items) => {
 const dashSyncLocks = {};
 
 // Função de sincronização para uma entidade
-// Função de sincronização para uma entidade
 async function syncEntity({ apiEntity, localEntity, tableName, idField }) {
   if (dashSyncLocks[localEntity]) {
     throw new Error("Sync já em andamento para " + localEntity);
@@ -114,7 +108,7 @@ async function syncEntity({ apiEntity, localEntity, tableName, idField }) {
     const apiData = await getApiData(apiEntity);
     const apiItems = Array.isArray(apiData) ? apiData : (apiData.data || apiData.items || []);
     
-    // 2. Primeiro, APAGA todos os dados locais (sempre)
+    // 2. PRIMEIRO: Apaga todos os dados locais do Supabase (sempre)
     const { error: deleteError } = await supabase
       .from(tableName)
       .delete()
@@ -135,7 +129,7 @@ async function syncEntity({ apiEntity, localEntity, tableName, idField }) {
     
     console.log(`📦 API retornou ${apiItems.length} registros para ${localEntity}`);
     
-    // 4. Mapeia os dados
+    // 4. Mapeia os dados usando mapApiFields
     const mappedItems = mapEntityData(apiEntity, apiItems);
     
     if (mappedItems.length === 0) {
@@ -179,17 +173,36 @@ async function syncEntity({ apiEntity, localEntity, tableName, idField }) {
 // Funções para buscar dados locais do Supabase
 const fetchLocalData = async (tableName) => {
   try {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Busca com paginação para pegar todos os registros
+    let allData = [];
+    let page = 0;
+    let hasMore = true;
+    const pageSize = 1000;
     
-    if (error) {
-      console.error(`Erro ao buscar dados de ${tableName}:`, error);
-      return [];
+    while (hasMore) {
+      const from = page * pageSize;
+      const to = from + pageSize - 1;
+      
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .range(from, to);
+      
+      if (error) {
+        console.error(`Erro ao buscar dados de ${tableName}:`, error);
+        return [];
+      }
+      
+      if (data && data.length > 0) {
+        allData = [...allData, ...data];
+      }
+      
+      hasMore = data && data.length === pageSize;
+      page++;
     }
     
-    return data || [];
+    console.log(`📊 ${tableName}: Carregados ${allData.length} registros`);
+    return allData || [];
   } catch (error) {
     console.error(`Exceção ao buscar ${tableName}:`, error);
     return [];
@@ -197,7 +210,6 @@ const fetchLocalData = async (tableName) => {
 };
 
 export default function Dashboard() {
-  console.log('📊 DASHBOARD: Componente está renderizando');
   const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
   const [syncResults, setSyncResults] = useState(null);
@@ -228,18 +240,18 @@ export default function Dashboard() {
     initialData: [] 
   });
 
+  // Log para debug
+  useEffect(() => {
+    if (questionariosQuery.data.length > 0) {
+      const unicos = countProntuariosUnicos(questionariosQuery.data);
+      console.log('📊 Dashboard - Total questionários:', questionariosQuery.data.length);
+      console.log('📊 Dashboard - Prontuários únicos (última versão):', unicos);
+    }
+  }, [questionariosQuery.data]);
+
   // Deduplica questionários: mantém apenas o mais recente por prontuário
   const totalProntuariosUnicos = useMemo(() => {
-    const todos = questionariosQuery.data || [];
-    const mapa = {};
-    for (const q of todos) {
-      const base = getProntuarioBase(q.id_user_app);
-      const versao = getProntuarioVersion(q.id_user_app);
-      if (!mapa[base] || versao > mapa[base]) {
-        mapa[base] = versao;
-      }
-    }
-    return Object.keys(mapa).length;
+    return countProntuariosUnicos(questionariosQuery.data || []);
   }, [questionariosQuery.data]);
 
   // Handler para sincronização completa

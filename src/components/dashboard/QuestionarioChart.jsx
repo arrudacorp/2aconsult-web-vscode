@@ -1,26 +1,8 @@
+// src/components/dashboard/QuestionarioChart.jsx
 import React, { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-
-// Retorna o número de versão do prontuário para comparação
-function getProntuarioVersion(prontuario) {
-  if (!prontuario) return 0;
-  const str = String(prontuario);
-  const slashIdx = str.indexOf("/");
-  if (slashIdx === -1) return 0;
-  const after = str.substring(slashIdx + 1).trim();
-  const num = parseInt(after, 10);
-  return isNaN(num) ? 0 : num;
-}
-
-// Extrai a chave base do prontuário (parte antes do "/")
-function getProntuarioBase(prontuario) {
-  if (!prontuario) return String(prontuario);
-  const str = String(prontuario);
-  const slashIdx = str.indexOf("/");
-  if (slashIdx === -1) return str.trim();
-  return str.substring(0, slashIdx).trim();
-}
+import { getProntuarioBase, getProntuarioVersion } from "@/lib/prontuarioUtils";
 
 // Mapeia valor numérico do campo risco para categoria
 function getRiscoCategory(risco) {
@@ -60,7 +42,7 @@ export default function QuestionarioChart({ questionarios }) {
 
   const total = chartData.reduce((s, d) => s + d.value, 0);
 
-  if (chartData.length === 0) {
+  if (chartData.length === 0 || total === 0) {
     return (
       <Card className="shadow-sm border">
         <CardHeader>

@@ -28,18 +28,41 @@ const createEntityAPI = (entityName, tableName) => {
   return {
     list: async () => {
       return safeQuery(async () => {
-        const { data, error } = await supabase.from(tableName).select('*');
-        if (error) throw error;
-        return data || [];
+        // Busca com paginação para pegar todos os registros
+        let allData = [];
+        let page = 0;
+        let hasMore = true;
+        const pageSize = 1000;
+        
+        console.log(`📊 ${entityName}: Iniciando busca paginada...`);
+        
+        while (hasMore) {
+          const from = page * pageSize;
+          const to = from + pageSize - 1;
+          
+          const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .range(from, to);
+          
+          if (error) throw error;
+          
+          if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            console.log(`📊 ${entityName}: Página ${page + 1} - ${data.length} registros (total: ${allData.length})`);
+          }
+          
+          // Verifica se tem mais páginas
+          hasMore = data && data.length === pageSize;
+          page++;
+          
+          // Limite de segurança para evitar loop infinito
+          if (page > 100) break;
+        }
+        
+        console.log(`📊 ${entityName}: Total carregado: ${allData.length} registros`);
+        return allData || [];
       }, entityName, []);
-    },
-    
-    get: async (id) => {
-      return safeQuery(async () => {
-        const { data, error } = await supabase.from(tableName).select('*').eq('id', id).single();
-        if (error) throw error;
-        return data;
-      }, entityName, null);
     },
     
     create: async (item) => {

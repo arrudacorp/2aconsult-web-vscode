@@ -1,3 +1,4 @@
+// src/pages/QuestionariosPage.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
+import { deduplicarQuestionarios } from "@/lib/prontuarioUtils";
 
 export default function QuestionariosPage() {
   const [users, setUsers] = useState([]);
@@ -35,24 +37,8 @@ export default function QuestionariosPage() {
     return map;
   }, [users]);
 
-  // Helpers de deduplicação por prontuário
-  function getProntuarioBase(prontuario) {
-    if (!prontuario) return String(prontuario || "");
-    const str = String(prontuario);
-    const idx = str.indexOf("/");
-    return idx === -1 ? str.trim() : str.substring(0, idx).trim();
-  }
-
-  function getProntuarioVersion(prontuario) {
-    if (!prontuario) return 0;
-    const str = String(prontuario);
-    const idx = str.indexOf("/");
-    if (idx === -1) return 0;
-    const num = parseInt(str.substring(idx + 1).trim(), 10);
-    return isNaN(num) ? 0 : num;
-  }
-
-  const deduplicado = useMemo(() => {
+  // Aplica filtros e deduplica usando a função centralizada
+  const dadosFiltradosEDeduplicados = useMemo(() => {
     // 1. Aplica filtros
     const comFiltro = allQuestionarios.filter((q) => {
       if (selectedUser && String(q.id_user) !== selectedUser) return false;
@@ -62,23 +48,14 @@ export default function QuestionariosPage() {
       }
       return true;
     });
-
-    // 2. Deduplica: mantém apenas o registro mais recente por prontuário
-    const mapa = {};
-    for (const q of comFiltro) {
-      const base = getProntuarioBase(q.id_user_app);
-      const versao = getProntuarioVersion(q.id_user_app);
-      if (!mapa[base] || versao > mapa[base].versao) {
-        mapa[base] = { ...q, versao };
-      }
-    }
-
-    return Object.values(mapa);
+    
+    // 2. Deduplica usando a função centralizada
+    return deduplicarQuestionarios(comFiltro);
   }, [allQuestionarios, selectedUser, filterDate]);
 
-  // 3. Ordena dinamicamente pela coluna selecionada
+  // Ordena dinamicamente pela coluna selecionada
   const filtered = useMemo(() => {
-    return [...deduplicado].sort((a, b) => {
+    return [...dadosFiltradosEDeduplicados].sort((a, b) => {
       let vA = a[sortKey];
       let vB = b[sortKey];
       // Ordenação numérica para risco
@@ -103,7 +80,7 @@ export default function QuestionariosPage() {
       const cmp = vA.localeCompare(vB, "pt-BR");
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [deduplicado, sortKey, sortDir, userMap]);
+  }, [dadosFiltradosEDeduplicados, sortKey, sortDir, userMap]);
 
   const clearFilters = () => {
     setSelectedUser("");
@@ -189,7 +166,7 @@ export default function QuestionariosPage() {
 
       <Card className="shadow-sm border">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h3 className="text-base font-semibold">Questionários ({filtered.length} registros)</h3>
+          <h3 className="text-base font-semibold">Questionários ({filtered.length} registros únicos por prontuário)</h3>
         </div>
         {loading ? (
           <div className="flex items-center justify-center py-16">
